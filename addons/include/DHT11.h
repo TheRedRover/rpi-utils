@@ -7,11 +7,18 @@ namespace addons {
 
 class DHT11 {
     public:
+        constexpr static int FREQUENCY = 100000;
         void attach(int iPin);
         void detach();
         bool read(float& fTemp, float& fHum);
+        DHT11() {};
+        virtual ~DHT11() {};
 
     private:
+        int waitLow(uint32_t uiTimeoutUs);
+        int waitHigh(uint32_t uiTimeoutUs);
+        bool sendStart();
+
         int m_iPin = -1;  // by default is "detach" state
 
     };

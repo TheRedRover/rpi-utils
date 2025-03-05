@@ -15,9 +15,7 @@ Logger::Logger()
 
 Logger::~Logger() {
     std::lock_guard<std::mutex> lock(m_mutex);
-    if (m_bIsSetup) {
-        closelog();
-    }
+    closelog();
 }
 
 void Logger::setup(bool bLogToStdout, int iMinLogLevel, const std::string& sIdent) {
