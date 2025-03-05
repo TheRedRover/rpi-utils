@@ -1,69 +1,99 @@
 #include "DHT11.h"
+#include <cstdint>
+#include <exception>
 #include <pigpio.h>
+#include <stdexcept>
+#include <string>
+#include <sys/syslog.h>
 #include <unistd.h>
 
 #include "logger.h"
 
 bool addons::DHT11::read(float& fTemp, float& fHum) {
-    uint8_t data[5] = {0};
-    int bit_count = 0, byte_index = 0;
-    
-    // Ensure pigpio is initialized
-    if (gpioInitialise() < 0) {
-        
+    Logger::log(LOG_DEBUG, "HDT11| Reading info from the gpio [" + 
+                                               std::to_string(m_iPin) + "]");
+
+    if (m_iPin < 0) {
+        Logger::log(LOG_ERR, "HDT11| Invalid GPIO pin [" + 
+                                                 std::to_string(m_iPin) + "]");
         return false;
     }
+
+    uint64_t data = 0;
 
     // Send start signal
-    gpioSetMode(m_iPin, PI_OUTPUT);
-    gpioWrite(m_iPin, 0);
-    usleep(18000);  // Wait at least 18ms
-    gpioWrite(m_iPin, 1);
-    usleep(40);
-    
+    sendRequest();
+
     // Switch to input mode to read data
-    gpioSetMode(m_iPin, PI_INPUT);
-    
-    // Wait for response signal
-    uint32_t start_time = gpioTick();
-    while (gpioRead(m_iPin) == 1) {
-        if (gpioTick() - start_time > 100) {
-            Logger::log(LOG_ERR, "DHT11 | response timeout");
-            return false;
+
+    try {
+        waitLow(420);
+        waitHigh(900);
+        waitLow(1000);
+        for (int i = 0; i < 40; ++i) {
+            data <<= 1;
+            int LowTime = waitHigh(1000);
+            int HighTime = waitLow(1000);
+            if (LowTime < HighTime) {
+                data |= 0x1;
+            }
         }
-    }
-
-    start_time = gpioTick();
-    while (gpioRead(m_iPin) == 0); // Wait for sensor to pull up
-    while (gpioRead(m_iPin) == 1); // Wait for sensor to pull down
-
-    // Read 40 bits (5 bytes) from sensor
-    for (int i = 0; i < 40; i++) {
-        while (gpioRead(m_iPin) == 0); // Wait for m_iPin to go high
-        start_time = gpioTick();
-
-        while (gpioRead(m_iPin) == 1); // Measure the width of the high pulse
-        if (gpioTick() - start_time > 50) {
-            data[byte_index] |= (1 << (7 - bit_count)); // Set bit to 1
-        }
-
-        bit_count++;
-        if (bit_count == 8) {
-            bit_count = 0;
-            byte_index++;
-        }
-    }
-
-    // Verify checksum
-    if (data[4] != (data[0] + data[1] + data[2] + data[3])) {
-        Logger::log(LOG_ERR, "DHT11 | failed to verify checksum");
+        // end state
+        waitHigh(1000);
+    } catch (const std::exception& e) {
+        gpioSetMode(m_iPin, PI_OUTPUT);
+        gpioWrite(m_iPin, 1);
+        Logger::log(LOG_ERR, "DHT11| Failed to get data from the sensor: [" + std::string(e.what()) + "]");
         return false;
     }
 
-    fHum = data[0];
-    fTemp = data[2];
+    uint8_t humHigh = (data >> 32) & 0xFF;
+    uint8_t humLow = (data >> 24) & 0xFF;
+    uint8_t tempHigh = (data >> 16) & 0xFF;
+    uint8_t tempLow = (data >> 8) & 0xFF;
+    uint8_t checksum = data & 0xFF;
 
-    gpioTerminate();
+    if (checksum != static_cast<uint8_t> (humHigh + humLow + tempHigh + tempLow)) {
+        Logger::log(LOG_ERR, "DHT11| Failed to read data from sensor: incorrect checksum");
+        return false;
+    }
+
+    fTemp = tempHigh;
+    fHum = humHigh;
+
+    return true;
+}
+
+int addons::DHT11::waitLow(uint32_t uiTimeoutMs) {
+    auto StartTime = gpioTick();
+    while (gpioRead(m_iPin)) {
+        if (uiTimeoutMs < gpioTick() - StartTime) {
+            throw std::runtime_error("Time out waiting for LOW: " + std::to_string(uiTimeoutMs));
+        }
+    }
+    return gpioTick() - StartTime;
+}
+
+int addons::DHT11::waitHigh(uint32_t uiTimeoutMs) {
+    auto StartTime = gpioTick();
+    while (!gpioRead(m_iPin)) {
+        if (uiTimeoutMs < gpioTick() - StartTime) {
+            throw std::runtime_error("Time out waiting for HIGH: " + std::to_string(uiTimeoutMs));
+        }
+    }
+    return gpioTick() - StartTime;
+}
+
+bool addons::DHT11::sendRequest() {
+    gpioSetMode(m_iPin, PI_OUTPUT);
+    gpioWrite(m_iPin,1);
+    gpioDelay(50000);
+
+
+    gpioWrite(m_iPin, 0);
+    gpioDelay(18000);
+    gpioWrite(m_iPin, 1);
+    gpioSetMode(m_iPin, PI_INPUT);
 
     return true;
 }
