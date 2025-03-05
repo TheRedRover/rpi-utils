@@ -12,3 +12,5 @@ target_link_libraries(
     libsensors
     ${PIGPIO_LIBRARY}
 )
+
+install(TARGETS temp-hum-clock DESTINATION bin)
