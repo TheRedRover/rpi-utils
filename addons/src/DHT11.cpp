@@ -9,6 +9,10 @@
 
 #include "logger.h"
 
+addons::DHT11::DHT11(int iPin) : m_iPin(iPin) {}
+
+addons::DHT11::~DHT11() {}
+
 bool addons::DHT11::read(float& fTemp, float& fHum) {
     Logger::log(LOG_DEBUG, "HDT11| Reading info from the gpio [" + 
                                                std::to_string(m_iPin) + "]");

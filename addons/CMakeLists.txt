@@ -12,7 +12,7 @@ add_library(
     libsensors
     STATIC
     src/DHT11.cpp
-    src/Display4Digits.cpp
+    src/TM1637.cpp
 )
 
 # Include headers

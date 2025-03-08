@@ -7,11 +7,10 @@ namespace addons {
 
 class DHT11 {
     public:
-        void attach(int iPin);
-        void detach();
+        DHT11(int pin);
+        virtual ~DHT11();
+
         bool read(float& fTemp, float& fHum);
-        DHT11() {};
-        virtual ~DHT11() {};
 
     private:
         int waitLow(uint32_t uiTimeoutUs);
@@ -22,14 +21,6 @@ class DHT11 {
 
     };
 
-}
-
-inline void addons::DHT11::attach(int iPin) {
-    m_iPin = iPin;
-}
-
-inline void addons::DHT11::detach() {
-    m_iPin = -1;
 }
 
 #endif  // DHT11_H_

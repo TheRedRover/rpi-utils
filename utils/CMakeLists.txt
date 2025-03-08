@@ -2,6 +2,8 @@ include_directories(
     include
 )
 
+set(CMAKE_REQUIRED_LIBRARIES "-L${atomic_lib_dir} -latomic")
+
 add_library(
     liblogger
     STATIC
