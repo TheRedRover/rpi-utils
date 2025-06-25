@@ -89,15 +89,19 @@ int addons::DHT11::waitHigh(uint32_t uiTimeoutMs) {
 }
 
 bool addons::DHT11::sendRequest() {
+    // Ensure line is HIGH under pull-up
     gpioSetMode(m_iPin, PI_OUTPUT);
-    gpioWrite(m_iPin,1);
+    gpioWrite(m_iPin, 1);
     gpioDelay(50000);
 
-
+    // Send start pulse (18 ms LOW)
     gpioWrite(m_iPin, 0);
     gpioDelay(18000);
+
+    // Release line, switch to input with pull-up
     gpioWrite(m_iPin, 1);
     gpioSetMode(m_iPin, PI_INPUT);
+    gpioSetPullUpDown(m_iPin, PI_PUD_UP);
 
     return true;
 }
