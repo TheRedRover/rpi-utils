@@ -65,11 +65,11 @@ public:
             
             if (std::getline(iss, key, '=') && (iss >> value)) {
                 if (key == "TM1637_CLK") {
-                    m_iDht11Pin = value;
+                    m_iDispClkPin = value;
                 } else if (key == "TM1637_DIO") {
                     m_iDispIOPin = value;
                 } else if (key == "DHT11_DATA") {
-                    m_iDispClkPin = value;
+                    m_iDht11Pin = value;
                 } else if (key == "LIGHT_SENSOR") {
                     m_iLightSensorPin = value;
                 }
@@ -180,6 +180,7 @@ bool parseCommandLineArguments(int argc, char* argv[], AppConfig &config) {
                     << "]" << std::endl;
                     return false;
                 }
+                break;
 
             case 'c': // --config
                 config.m_sPinConfigPath = optarg;
@@ -214,6 +215,7 @@ void dht11Runner(const PinConfig& oConf) {
             fTemp.store(fTmpTemp);
             std::stringstream ss;
             ss << std::fixed << std::setprecision(1) << fTemp.load().value() << "C*\t" << fHum.load().value();
+            Logger::log(LOG_DEBUG, "dht11Runner| Getting data from the sensor:" + ss.str());
         } else {
             Logger::log(LOG_ERR, "Failed to get info from the DHT11 sensor");
         }
@@ -247,6 +249,14 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
     addons::TM1637 oTM1637(oPinConf.m_iDispIOPin, oPinConf.m_iDispClkPin);
     addons::BoolReader oLightSensor(oPinConf.m_iLightSensorPin);
 
+    bool bLight = false;
+    if (!oLightSensor.read(bLight)) {
+        // If it fails to get the brightness, make the brightness max
+        bLight = true;
+    }
+    oTM1637.setBrightness(bLight ? 6 : 2);
+
+
     oTM1637.display("Run", false);
 
     while(!bTermSignal.load()) {
@@ -264,21 +274,13 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
         }
 
         if (oConf.m_bTemperature && fTemp.load().has_value()) {
-            ss.str("");
+            ss.clear();
             float fTmpTemp = fTemp.load().value();
             if (fTmpTemp < 0) {
                 ss << std::setw(3) << std::fixed << std::setprecision(0) << fTmpTemp << "*";
             } else {
                 ss << std::setw(2) << std::fixed << std::setprecision(0) << fTmpTemp << "*C";
             }
-
-            bool bLight = false;
-
-            if (!oLightSensor.read(bLight)) {
-                // If it fails to get the brightness, make the brightness max
-                bLight = true;
-            }
-            oTM1637.setBrightness(bLight ? 6 : 2);
 
             oTM1637.display(ss.str(), false);
 
@@ -292,8 +294,9 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
         }
 
         if (oConf.m_bHumidity && fHum.load().has_value()) {
-            ss.str("");
-            ss << std::setw(4) << std::setprecision(0) << fHum.load().value();
+            ss.clear();
+            float fTmpHum = fHum.load().value();
+            ss << std::setw(4) << std::setprecision(0) << fTmpHum;
 
             oTM1637.display(ss.str(), false);
 
