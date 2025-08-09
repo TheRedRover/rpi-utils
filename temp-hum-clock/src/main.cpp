@@ -323,7 +323,7 @@ int main(int argc, char* argv[]) {
 
     Logger::setup(config.m_bStdOut, config.m_ilogLevel, "temp-hum-clock");
 
-    if (!config.m_bTime && !config.m_bTemperature && config.m_bHumidity) {
+    if (!config.m_bTime && !config.m_bTemperature && !config.m_bHumidity) {
         Logger::log(LOG_WARNING, "All options to display are disabled. Exiting");
         return 0;
     }
