@@ -13,6 +13,7 @@ add_library(
     STATIC
     src/DHT11.cpp
     src/TM1637.cpp
+    src/BoolReader.cpp
 )
 
 # Include headers

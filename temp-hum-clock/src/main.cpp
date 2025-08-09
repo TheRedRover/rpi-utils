@@ -15,6 +15,7 @@
 #include <condition_variable>
 #include <mutex>
 
+#include "BoolReader.h"
 #include "DHT11.h"
 #include "TM1637.h"
 #include "logger.h"
@@ -42,8 +43,9 @@ class PinConfig {
 public:
 
     int m_iDht11Pin = 17; // GPIO17 (BCM numbering, physical pin 11)
-    int m_iDispIOPin = 23; // GPIO2 (BCM numbering, physical pin 16)
-    int m_iDispClkPin = 18; // GPIO2 (BCM numbering, physical pin 12)
+    int m_iDispIOPin = 23; // GPIO23 (BCM numbering, physical pin 16)
+    int m_iDispClkPin = 18; // GPIO18 (BCM numbering, physical pin 12)
+    int m_iLightSensorPin = 27; //GPIO27 (BCM numbering, physical pin 13)
 
     bool readPinConfig(std::string sFilepath) {
 
@@ -68,6 +70,8 @@ public:
                     m_iDispIOPin = value;
                 } else if (key == "DHT11_DATA") {
                     m_iDispClkPin = value;
+                } else if (key == "LIGHT_SENSOR") {
+                    m_iLightSensorPin = value;
                 }
             }
         }
@@ -211,7 +215,7 @@ void dht11Runner(const PinConfig& oConf) {
             std::stringstream ss;
             ss << std::fixed << std::setprecision(1) << fTemp.load().value() << "C*\t" << fHum.load().value();
         } else {
-            Logger::log(LOG_ERR, "Failed to get info from the sensor");
+            Logger::log(LOG_ERR, "Failed to get info from the DHT11 sensor");
         }
 
         std::unique_lock <std::mutex> lock (oMutex);
@@ -241,6 +245,7 @@ void updateDisplayDuringTime(const AppConfig &oConf, addons::TM1637 &oTM1637) {
 
 void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
     addons::TM1637 oTM1637(oPinConf.m_iDispIOPin, oPinConf.m_iDispClkPin);
+    addons::BoolReader oLightSensor(oPinConf.m_iLightSensorPin);
 
     oTM1637.display("Run", false);
 
@@ -266,6 +271,14 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
             } else {
                 ss << std::setw(2) << std::fixed << std::setprecision(0) << fTmpTemp << "*C";
             }
+
+            bool bLight = false;
+
+            if (!oLightSensor.read(bLight)) {
+                // If it fails to get the brightness, make the brightness max
+                bLight = true;
+            }
+            oTM1637.setBrightness(bLight ? 6 : 2);
 
             oTM1637.display(ss.str(), false);
 
