@@ -106,22 +106,22 @@ int addons::DHT11::waitHigh(uint32_t uiTimeoutUs) {
 }
 
 bool addons::DHT11::sendRequest() {
-    // 1. Ensure line is HIGH (idle) for a moment
+    // 1. Ensure line is HIGH (idle)
     gpioSetMode(m_iPin, PI_OUTPUT);
     gpioWrite(m_iPin, 1);
     gpioDelay(50000); 
 
-    // 2. Send start pulse: Pull LOW for at least 18ms
+    // 2. Start signal: Pull LOW for 20ms
     gpioWrite(m_iPin, 0);
-    gpioDelay(20000); // 20ms
+    gpioDelay(20000); 
 
-    // 3. Pull HIGH and wait briefly for the sensor to take over
-    gpioWrite(m_iPin, 1);
-    gpioDelay(30); // 30us stabilization delay
-
-    // 4. Switch to input mode with internal pull-up
+    // 3. CRITICAL: Switch to INPUT immediately.
+    // Do not manually write HIGH. Let the pull-up resistor lift the line.
+    // This prevents the Pi from "fighting" the sensor if it responds fast.
     gpioSetMode(m_iPin, PI_INPUT);
     gpioSetPullUpDown(m_iPin, PI_PUD_UP);
-
+    
+    // Give the pull-up a tiny moment (microsecond) to lift the line 
+    // before we start looking for the sensor's LOW pulse.
     return true;
 }

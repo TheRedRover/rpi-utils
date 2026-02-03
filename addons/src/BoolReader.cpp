@@ -15,7 +15,7 @@ BoolReader::~BoolReader() {}
 bool BoolReader::read(bool& bValue) {
     try {
         gpioSetMode(m_iPin, PI_INPUT);
-        gpioDelay(10);
+        gpioDelay(100);
         int iData =  gpioRead(m_iPin);
         Logger::log(LOG_DEBUG, "BoolReader| Get data [" + std::to_string(iData) +"]");
         bValue = iData;
