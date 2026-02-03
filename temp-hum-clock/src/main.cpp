@@ -205,7 +205,7 @@ bool parseCommandLineArguments(int argc, char* argv[], AppConfig &config) {
 
 void dht11Runner(const PinConfig& oConf) {
     addons::DHT11 oDht11(oConf.m_iDht11Pin);
-
+    int iFailCounter = 0;
     while(!bTermSignal.load()) {
         float fTmpTemp;
         float fTmpHum;
@@ -218,6 +218,17 @@ void dht11Runner(const PinConfig& oConf) {
             Logger::log(LOG_DEBUG, "dht11Runner| Getting data from the sensor:" + ss.str());
         } else {
             Logger::log(LOG_ERR, "Failed to get info from the DHT11 sensor");
+            if (iFailCounter > 10 && fHum.load().has_value()) {
+                Logger::log(LOG_WARNING, "Data from DHT11 are outdated, reseting");
+                fHum.load().reset();
+                fHum.load().reset();
+            }
+            
+            if (iFailCounter > 10) {
+                // reset counter
+                iFailCounter = 0;
+            }
+            iFailCounter++;
         }
 
         std::unique_lock <std::mutex> lock (oMutex);
@@ -250,22 +261,19 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
     addons::BoolReader oLightSensor(oPinConf.m_iLightSensorPin);
 
     bool bLight = false;
-    if (!oLightSensor.read(bLight)) {
-        // If it fails to get the brightness, make the brightness max
-        bLight = true;
-    }
-    oTM1637.setBrightness(bLight ? 6 : 2);
 
 
     oTM1637.display("Run", false);
+    float fTmpTemp;
+    float fTmpHum;
 
     while(!bTermSignal.load()) {
-        float fTmpTemp;
-        float fTmpHum;
-
-        std::stringstream ss;
-
         if (oConf.m_bTime) {
+            if (!oLightSensor.read(bLight)) {
+                // If it fails to get the brightness, make the brightness max
+                bLight = true;
+            }
+            oTM1637.setBrightness(bLight ? 6 : 2);
             updateDisplayDuringTime(oConf, oTM1637);
         }
 
@@ -274,7 +282,7 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
         }
 
         if (oConf.m_bTemperature && fTemp.load().has_value()) {
-            ss.clear();
+            std::stringstream ss;
             float fTmpTemp = fTemp.load().value();
             if (fTmpTemp < 0) {
                 ss << std::setw(3) << std::fixed << std::setprecision(0) << fTmpTemp << "*";
@@ -282,6 +290,11 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
                 ss << std::setw(2) << std::fixed << std::setprecision(0) << fTmpTemp << "*C";
             }
 
+            if (!oLightSensor.read(bLight)) {
+                // If it fails to get the brightness, make the brightness max
+                bLight = true;
+            }
+            oTM1637.setBrightness(bLight ? 6 : 2);
             oTM1637.display(ss.str(), false);
 
             std::unique_lock <std::mutex> lock (oMutex);
@@ -294,10 +307,15 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
         }
 
         if (oConf.m_bHumidity && fHum.load().has_value()) {
-            ss.clear();
+            std::stringstream ss;
             float fTmpHum = fHum.load().value();
             ss << std::setw(4) << std::setprecision(0) << fTmpHum;
 
+            if (!oLightSensor.read(bLight)) {
+                // If it fails to get the brightness, make the brightness max
+                bLight = true;
+            }
+            oTM1637.setBrightness(bLight ? 6 : 2);
             oTM1637.display(ss.str(), false);
 
             std::unique_lock <std::mutex> lock (oMutex);
