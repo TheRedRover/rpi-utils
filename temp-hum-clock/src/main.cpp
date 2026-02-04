@@ -207,12 +207,15 @@ void dht11Runner(const PinConfig& oConf) {
     addons::DHT11 oDht11(oConf.m_iDht11Pin);
     int iFailCounter = 0;
     while(!bTermSignal.load()) {
-        float fTmpTemp;
-        float fTmpHum;
+        std::optional<float> fTmpTemp;
+        std::optional<float> fTmpHum;
 
-        if(oDht11.read( fTmpTemp, fTmpHum)) {
-            fHum.store(fTmpHum);
-            fTemp.store(fTmpTemp);
+        fTmpTemp = oDht11.getTemp();
+        fTmpHum = oDht11.getHum();
+
+        if (fTmpHum.has_value() && fTmpTemp.has_value()) {
+            fHum.store(fTmpHum.value());
+            fTemp.store(fTmpTemp.value());
             std::stringstream ss;
             ss << std::fixed << std::setprecision(1) << fTemp.load().value() << "C*\t" << fHum.load().value();
             Logger::log(LOG_DEBUG, "dht11Runner| Getting data from the sensor:" + ss.str());
@@ -251,7 +254,7 @@ void updateDisplayDuringTime(const AppConfig &oConf, addons::TM1637 &oTM1637) {
             std::string timeStr = oss.str();
 
             oTM1637.display(timeStr, true);
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
         }
     }
 }
@@ -266,6 +269,7 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
     oTM1637.display("Run", false);
     float fTmpTemp;
     float fTmpHum;
+    auto sec = std::chrono::seconds(oConf.m_iShowDelay);
 
     while(!bTermSignal.load()) {
         if (oConf.m_bTime) {
@@ -273,7 +277,7 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
                 // If it fails to get the brightness, make the brightness max
                 bLight = true;
             }
-            oTM1637.setBrightness(bLight ? 6 : 2);
+            oTM1637.setBrightness(bLight ? 2 : 6);
             updateDisplayDuringTime(oConf, oTM1637);
         }
 
@@ -294,11 +298,10 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
                 // If it fails to get the brightness, make the brightness max
                 bLight = true;
             }
-            oTM1637.setBrightness(bLight ? 6 : 2);
+            oTM1637.setBrightness(bLight ? 2 : 6);
             oTM1637.display(ss.str(), false);
 
             std::unique_lock <std::mutex> lock (oMutex);
-            auto sec = std::chrono::seconds(oConf.m_iShowDelay);
             cvTerminate.wait_for(lock, sec);
         }
 
@@ -309,17 +312,16 @@ void TM1637Runner(const AppConfig& oConf, const PinConfig& oPinConf) {
         if (oConf.m_bHumidity && fHum.load().has_value()) {
             std::stringstream ss;
             float fTmpHum = fHum.load().value();
-            ss << std::setw(4) << std::setprecision(0) << fTmpHum;
+            ss << std::setw(4) << std::fixed << std::setprecision(0) << fTmpHum;
 
             if (!oLightSensor.read(bLight)) {
                 // If it fails to get the brightness, make the brightness max
                 bLight = true;
             }
-            oTM1637.setBrightness(bLight ? 6 : 2);
+            oTM1637.setBrightness(bLight ? 2 : 6);
             oTM1637.display(ss.str(), false);
 
             std::unique_lock <std::mutex> lock (oMutex);
-            auto sec = std::chrono::seconds(oConf.m_iShowDelay);
             cvTerminate.wait_for(lock, sec);
         }
     }
